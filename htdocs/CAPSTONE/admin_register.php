@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once 'db_connect.php';
+require_once 'config.php'; // Include configuration file
 
 $message = "";
 $error = "";
@@ -10,39 +11,52 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $last_name = mysqli_real_escape_string($connection, trim($_POST['last_name']));
     $email = mysqli_real_escape_string($connection, trim($_POST['email']));
     $phone = mysqli_real_escape_string($connection, trim($_POST['phone']));
+    $employee_id = mysqli_real_escape_string($connection, trim($_POST['employee_id']));
     $password = trim($_POST['password']);
     $confirm_password = trim($_POST['confirm_password']);
+    $admin_key = trim($_POST['admin_key']);
     
     // Validation
-    if (empty($first_name) || empty($last_name) || empty($email) || empty($phone) || empty($password)) {
+    if (empty($first_name) || empty($last_name) || empty($email) || empty($phone) || empty($employee_id) || empty($password) || empty($admin_key)) {
         $error = "All fields are required.";
+    } elseif (!validateAdminKey($admin_key)) {
+        $error = "Invalid admin registration key.";
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = "Invalid email format.";
-    } elseif (strlen($password) < 6) {
-        $error = "Password must be at least 6 characters long.";
+    } elseif (strlen($password) < 8) {
+        $error = "Password must be at least 8 characters long.";
     } elseif ($password !== $confirm_password) {
         $error = "Passwords do not match.";
     } else {
-        // Check if email already exists
-        $check_email = "SELECT email FROM customers WHERE email = ?";
-        $stmt = mysqli_prepare($connection, $check_email);
-        mysqli_stmt_bind_param($stmt, "s", $email);
+        // Check if email or employee_id already exists
+        $check_admin = "SELECT email FROM admins WHERE email = ? OR employee_id = ?";
+        $stmt = mysqli_prepare($connection, $check_admin);
+        mysqli_stmt_bind_param($stmt, "ss", $email, $employee_id);
         mysqli_stmt_execute($stmt);
         $result = mysqli_stmt_get_result($stmt);
         
         if (mysqli_num_rows($result) > 0) {
-            $error = "Email already exists. Please use a different email.";
+            $error = "Email or Employee ID already exists. Please use different credentials.";
         } else {
             // Hash password
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
             
-            // Insert new customer
-            $insert_query = "INSERT INTO customers (first_name, last_name, email, phone, password, created_at) VALUES (?, ?, ?, ?, ?, NOW())";
+            // Insert new admin
+            $insert_query = "INSERT INTO admins (first_name, last_name, email, phone, employee_id, password, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())";
             $stmt = mysqli_prepare($connection, $insert_query);
-            mysqli_stmt_bind_param($stmt, "sssss", $first_name, $last_name, $email, $phone, $hashed_password);
+            mysqli_stmt_bind_param($stmt, "ssssss", $first_name, $last_name, $email, $phone, $employee_id, $hashed_password);
             
             if (mysqli_stmt_execute($stmt)) {
-                $message = "Registration successful! You can now login.";
+                $message = "Admin registration successful! You can now login.";
+                
+                // Optional: Log the admin registration
+                $log_query = "INSERT INTO audit_logs (user_type, user_id, action, ip_address, user_agent, created_at) VALUES ('admin', LAST_INSERT_ID(), 'admin_registered', ?, ?, NOW())";
+                $log_stmt = mysqli_prepare($connection, $log_query);
+                $ip_address = $_SERVER['REMOTE_ADDR'];
+                $user_agent = $_SERVER['HTTP_USER_AGENT'];
+                mysqli_stmt_bind_param($log_stmt, "ss", $ip_address, $user_agent);
+                mysqli_stmt_execute($log_stmt);
+                mysqli_stmt_close($log_stmt);
             } else {
                 $error = "Registration failed. Please try again.";
             }
@@ -57,7 +71,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Registration - Starbucks Management System</title>
+    <title>Admin Registration - <?php echo SITE_NAME; ?></title>
     <style>
         * {
             margin: 0;
@@ -67,20 +81,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         body {
             font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #00704A, #008B5A);
+            background: linear-gradient(135deg, #8B4513, #A0522D);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 1rem;
         }
         
         .container {
             background: white;
             padding: 2rem;
             border-radius: 10px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
             width: 100%;
-            max-width: 400px;
+            max-width: 450px;
         }
         
         .logo {
@@ -89,7 +104,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         .logo h1 {
-            color: #00704A;
+            color: #8B4513;
             font-size: 2rem;
             margin-bottom: 0.5rem;
         }
@@ -97,6 +112,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .logo p {
             color: #666;
             font-size: 0.9rem;
+            font-weight: bold;
         }
         
         .form-group {
@@ -127,13 +143,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         input[type="tel"]:focus,
         input[type="password"]:focus {
             outline: none;
-            border-color: #00704A;
+            border-color: #8B4513;
         }
         
         .btn {
             width: 100%;
             padding: 0.8rem;
-            background: #00704A;
+            background: #8B4513;
             color: white;
             border: none;
             border-radius: 5px;
@@ -143,7 +159,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         .btn:hover {
-            background: #005A3C;
+            background: #704010;
         }
         
         .message {
@@ -171,12 +187,42 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         .links a {
-            color: #00704A;
+            color: #8B4513;
             text-decoration: none;
+            display: inline-block;
+            margin: 0.5rem;
         }
         
         .links a:hover {
             text-decoration: underline;
+        }
+        
+        .admin-note {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 0.8rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+        
+        .key-info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 0.8rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+        
+        .key-info code {
+            background: #f8f9fa;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #e83e8c;
         }
     </style>
 </head>
@@ -184,7 +230,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <div class="container">
         <div class="logo">
             <h1>Starbucks</h1>
-            <p>Customer Registration</p>
+            <p>Admin Registration</p>
+        </div>
+        
+        <div class="admin-note">
+            <strong>🛡️ Admin Registration:</strong> You need a valid admin key to register as an administrator.
+        </div>
+        
+        <div class="key-info">
+            <strong>🔑 For Testing/Development:</strong><br>
+            Use admin key: <code>STARBUCKS_ADMIN_2024</code><br>
+            <small>⚠️ In production, contact your IT administrator for the current admin key.</small>
         </div>
         
         <?php if ($message): ?>
@@ -221,21 +277,36 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </div>
             
             <div class="form-group">
+                <label for="employee_id">Employee ID:</label>
+                <input type="text" id="employee_id" name="employee_id" required 
+                       value="<?php echo isset($_POST['employee_id']) ? htmlspecialchars($_POST['employee_id']) : ''; ?>"
+                       placeholder="e.g., SB001">
+            </div>
+            
+            <div class="form-group">
+                <label for="admin_key">Admin Registration Key:</label>
+                <input type="password" id="admin_key" name="admin_key" required 
+                       placeholder="Enter admin registration key">
+            </div>
+            
+            <div class="form-group">
                 <label for="password">Password:</label>
-                <input type="password" id="password" name="password" required>
+                <input type="password" id="password" name="password" required 
+                       minlength="8" placeholder="Minimum 8 characters">
             </div>
             
             <div class="form-group">
                 <label for="confirm_password">Confirm Password:</label>
-                <input type="password" id="confirm_password" name="confirm_password" required>
+                <input type="password" id="confirm_password" name="confirm_password" required 
+                       minlength="8" placeholder="Re-enter password">
             </div>
             
-            <button type="submit" class="btn">Register</button>
+            <button type="submit" class="btn">🔐 Register Admin</button>
         </form>
         
         <div class="links">
-            <p>Already have an account? <a href="customer_login.php">Login here</a></p>
-            <p><a href="admin_register.php">Admin Registration</a></p>
+            <p>Already have an admin account? <a href="admin_login.php">Login here</a></p>
+            <p><a href="customer_register.php">Customer Registration</a></p>
         </div>
     </div>
 </body>
