@@ -22,9 +22,44 @@ try {
     exit;
 }
 
-// Fetch active products with stock > 0
-$stmt = $pdo->query("SELECT * FROM products WHERE status = 'active' AND stock_quantity > 0 ORDER BY is_featured DESC, sort_order ASC, name ASC");
+// Get selected category from URL parameter
+$selected_category = isset($_GET['category']) ? $_GET['category'] : 'all';
+
+// Fetch active products with stock > 0, filtered by category
+if ($selected_category === 'all') {
+    $stmt = $pdo->query("
+        SELECT p.*, c.name as category_name 
+        FROM products p 
+        LEFT JOIN categories c ON p.category_id = c.id 
+        WHERE p.status = 'active' AND p.stock_quantity > 0 
+        ORDER BY p.is_featured DESC, p.sort_order ASC, p.name ASC
+    ");
+} else {
+    $stmt = $pdo->prepare("
+        SELECT p.*, c.name as category_name 
+        FROM products p 
+        LEFT JOIN categories c ON p.category_id = c.id 
+        WHERE p.status = 'active' AND p.stock_quantity > 0 AND p.category_id = ? 
+        ORDER BY p.is_featured DESC, p.sort_order ASC, p.name ASC
+    ");
+    $stmt->execute([$selected_category]);
+}
 $products = $stmt->fetchAll();
+
+// Fetch all available categories for the filter buttons
+$stmt_categories = $pdo->query("
+    SELECT c.id, c.name, COUNT(p.id) as product_count
+    FROM categories c
+    INNER JOIN products p ON c.id = p.category_id
+    WHERE c.status = 'active' AND p.status = 'active' AND p.stock_quantity > 0
+    GROUP BY c.id, c.name
+    ORDER BY c.sort_order ASC, c.name ASC
+");
+$categories = $stmt_categories->fetchAll();
+
+// Get total product count for "All Products" button
+$stmt_total = $pdo->query("SELECT COUNT(*) as total FROM products WHERE status = 'active' AND stock_quantity > 0");
+$total_products = $stmt_total->fetch()['total'];
 
 // Get customer name if logged in
 $customer_username = '';
@@ -132,6 +167,51 @@ if (isset($_SESSION['customer_id'])) {
             color: #00704A;
         }
 
+        /* Category Filter Styles */
+        .category-filters {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .category-btn {
+            background: #e9ecef;
+            color: #495057;
+            padding: 0.5rem 1rem;
+            text-decoration: none;
+            border-radius: 20px;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: 2px solid transparent;
+        }
+
+        .category-btn:hover {
+            background: #00704A;
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        .category-btn.active {
+            background: #00704A;
+            color: white;
+            border-color: #005f3d;
+        }
+
+        .category-count {
+            background: rgba(255,255,255,0.2);
+            color: inherit;
+            padding: 0.1rem 0.4rem;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            margin-left: 0.3rem;
+        }
+
         .products {
             display: flex;
             flex-wrap: wrap;
@@ -196,6 +276,16 @@ if (isset($_SESSION['customer_id'])) {
             margin-bottom: 8px;
         }
 
+        .product-category {
+            font-size: 0.85em;
+            color: #007bff;
+            background: #e7f3ff;
+            padding: 0.2rem 0.5rem;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            text-transform: capitalize;
+        }
+
         .featured {
             color: #e6b800;
             font-size: 1.3em;
@@ -223,15 +313,28 @@ if (isset($_SESSION['customer_id'])) {
             text-align: left;
         }
 
+        .no-products {
+            text-align: center;
+            color: #666;
+            font-size: 1.1rem;
+            padding: 2rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
         @media (max-width: 900px) {
             .products { gap: 16px; }
             .product-card { width: 90vw; max-width: 340px; }
             .container { padding: 1rem 0.5rem; }
+            .category-filters { gap: 0.3rem; }
+            .category-btn { font-size: 0.8rem; padding: 0.4rem 0.8rem; }
         }
 
         @media (max-width: 600px) {
             .header-content { flex-direction: column; gap: 1rem; }
             .container { padding: 0.5rem 0.2rem; }
+            .category-filters { flex-direction: column; align-items: center; }
         }
     </style>
 </head>
@@ -241,8 +344,6 @@ if (isset($_SESSION['customer_id'])) {
             <div class="logo">
                 <span class="starbucks-products-title">Starbucks Products</span>
                 <p>Discover our menu!</p>
-                <!-- Optionally, you can remove the old h1 below if you want only one title -->
-                <!-- <h1>Starbucks Products</h1> -->
             </div>
             <div class="customer-info">
                 <?php if ($customer_username): ?>
@@ -257,9 +358,44 @@ if (isset($_SESSION['customer_id'])) {
     </header>
     <div class="container">
         <h1>Available Products</h1>
+        
+        <!-- Category Filter Buttons -->
+        <?php if (!empty($categories)): ?>
+            <div class="category-filters">
+                <a href="?category=all" class="category-btn <?= $selected_category === 'all' ? 'active' : '' ?>">
+                    All Products
+                    <span class="category-count"><?= $total_products ?></span>
+                </a>
+                <?php foreach ($categories as $cat): ?>
+                    <a href="?category=<?= urlencode($cat['id']) ?>" 
+                       class="category-btn <?= $selected_category == $cat['id'] ? 'active' : '' ?>">
+                        <?= htmlspecialchars($cat['name']) ?>
+                        <span class="category-count"><?= $cat['product_count'] ?></span>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+
         <div class="products">
             <?php if (empty($products)): ?>
-                <p>No products available.</p>
+                <div class="no-products">
+                    <?php if ($selected_category === 'all'): ?>
+                        No products available at the moment.
+                    <?php else: ?>
+                        <?php
+                        // Get category name for display
+                        $category_name = 'this category';
+                        foreach ($categories as $cat) {
+                            if ($cat['id'] == $selected_category) {
+                                $category_name = $cat['name'];
+                                break;
+                            }
+                        }
+                        ?>
+                        No products found in "<?= htmlspecialchars($category_name) ?>" category.
+                        <br><a href="?category=all" style="color: #00704A; text-decoration: none;">← View all products</a>
+                    <?php endif; ?>
+                </div>
             <?php else: ?>
                 <?php foreach ($products as $product): ?>
                     <div class="product-card">
@@ -278,6 +414,9 @@ if (isset($_SESSION['customer_id'])) {
                             <div class="product-img">&#9749;</div>
                         <?php endif; ?>
                         <div class="product-name"><?= htmlspecialchars($product['name']) ?></div>
+                        <?php if (!empty($product['category_name'])): ?>
+                            <div class="product-category"><?= htmlspecialchars($product['category_name']) ?></div>
+                        <?php endif; ?>
                         <div class="product-desc"><?= htmlspecialchars($product['description']) ?></div>
                         <div class="product-price">$<?= number_format($product['price'], 2) ?></div>
                         <div class="stock-info">In stock: <?= (int)$product['stock_quantity'] ?></div>

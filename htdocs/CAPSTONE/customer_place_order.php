@@ -30,29 +30,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $quantity = intval($_POST['quantity']);
     
     if ($product_id > 0 && $quantity > 0) {
-        // Get product details
-        $stmt_product = $connection->prepare("SELECT name, price FROM products WHERE id = ? AND status = 'active'");
+        // Get product details including stock
+        $stmt_product = $connection->prepare("SELECT name, price, stock_quantity FROM products WHERE id = ? AND status = 'active'");
         $stmt_product->bind_param("i", $product_id);
         $stmt_product->execute();
         $product_result = $stmt_product->get_result();
         
         if ($product_result->num_rows > 0) {
             $product = $product_result->fetch_assoc();
+            $available_stock = intval($product['stock_quantity']);
             
-            // Add to cart or update quantity
-            if (isset($_SESSION['cart'][$product_id])) {
-                $_SESSION['cart'][$product_id]['quantity'] += $quantity;
+            // Check if product is in stock
+            if ($available_stock <= 0) {
+                $error_message = "Sorry, this product is currently out of stock.";
             } else {
-                $_SESSION['cart'][$product_id] = [
-                    'name' => $product['name'],
-                    'price' => $product['price'],
-                    'quantity' => $quantity
-                ];
+                // Calculate total quantity if item already in cart
+                $current_cart_quantity = isset($_SESSION['cart'][$product_id]) ? $_SESSION['cart'][$product_id]['quantity'] : 0;
+                $total_quantity = $current_cart_quantity + $quantity;
+                
+                // Check if requested quantity exceeds available stock
+                if ($total_quantity > $available_stock) {
+                    $error_message = "Sorry, only {$available_stock} items are available in stock. You already have {$current_cart_quantity} in your cart.";
+                } else {
+                    // Add to cart or update quantity
+                    if (isset($_SESSION['cart'][$product_id])) {
+                        $_SESSION['cart'][$product_id]['quantity'] += $quantity;
+                    } else {
+                        $_SESSION['cart'][$product_id] = [
+                            'name' => $product['name'],
+                            'price' => $product['price'],
+                            'quantity' => $quantity
+                        ];
+                    }
+                    
+                    $success_message = "Item added to cart successfully!";
+                }
             }
-            
-            $success_message = "Item added to cart successfully!";
+        } else {
+            $error_message = "Product not found or not available.";
         }
         $stmt_product->close();
+    } else {
+        $error_message = "Invalid quantity. Please enter a valid amount.";
     }
 }
 
@@ -72,11 +91,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     
     if (isset($_SESSION['cart'][$product_id])) {
         if ($quantity > 0) {
-            $_SESSION['cart'][$product_id]['quantity'] = $quantity;
+            // Check stock availability before updating
+            $stmt_stock = $connection->prepare("SELECT stock_quantity FROM products WHERE id = ? AND status = 'active'");
+            $stmt_stock->bind_param("i", $product_id);
+            $stmt_stock->execute();
+            $stock_result = $stmt_stock->get_result();
+            
+            if ($stock_result->num_rows > 0) {
+                $stock_data = $stock_result->fetch_assoc();
+                $available_stock = intval($stock_data['stock_quantity']);
+                
+                if ($quantity > $available_stock) {
+                    $error_message = "Sorry, only {$available_stock} items are available in stock.";
+                } else {
+                    $_SESSION['cart'][$product_id]['quantity'] = $quantity;
+                    $success_message = "Cart updated!";
+                }
+            } else {
+                $error_message = "Product no longer available.";
+                unset($_SESSION['cart'][$product_id]);
+            }
+            $stmt_stock->close();
         } else {
             unset($_SESSION['cart'][$product_id]);
+            $success_message = "Item removed from cart!";
         }
-        $success_message = "Cart updated!";
     }
 }
 
@@ -86,42 +125,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         try {
             $connection->begin_transaction();
             
-            // Calculate totals
-            $subtotal = 0;
-            foreach ($_SESSION['cart'] as $item) {
-                $subtotal += $item['price'] * $item['quantity'];
-            }
-            
-            $tax_rate = 0.08; // 8% tax
-            $tax_amount = $subtotal * $tax_rate;
-            $final_amount = $subtotal + $tax_amount;
-            
-            // Generate order number
-            $order_number = 'SB' . date('Y') . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
-            
-            // Insert order
-            $stmt_order = $connection->prepare("INSERT INTO orders (customer_id, order_number, total_amount, tax_amount, final_amount, status, payment_status, order_type) VALUES (?, ?, ?, ?, ?, 'pending', 'pending', 'takeaway')");
-            $stmt_order->bind_param("isddd", $customer_id, $order_number, $subtotal, $tax_amount, $final_amount);
-            $stmt_order->execute();
-            $order_id = $connection->insert_id;
-            $stmt_order->close();
-            
-            // Insert order items
-            $stmt_item = $connection->prepare("INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?, ?)");
+            // Validate stock availability for all items in cart
+            $stock_validation_passed = true;
+            $stock_errors = [];
             
             foreach ($_SESSION['cart'] as $product_id => $item) {
-                $total_price = $item['price'] * $item['quantity'];
-                $stmt_item->bind_param("iisidi", $order_id, $product_id, $item['name'], $item['quantity'], $item['price'], $total_price);
-                $stmt_item->execute();
+                $stmt_stock = $connection->prepare("SELECT name, stock_quantity FROM products WHERE id = ? AND status = 'active'");
+                $stmt_stock->bind_param("i", $product_id);
+                $stmt_stock->execute();
+                $stock_result = $stmt_stock->get_result();
+                
+                if ($stock_result->num_rows > 0) {
+                    $product_data = $stock_result->fetch_assoc();
+                    $available_stock = intval($product_data['stock_quantity']);
+                    
+                    if ($available_stock < $item['quantity']) {
+                        $stock_validation_passed = false;
+                        $stock_errors[] = "{$product_data['name']}: Only {$available_stock} available (requested: {$item['quantity']})";
+                    }
+                } else {
+                    $stock_validation_passed = false;
+                    $stock_errors[] = "{$item['name']}: Product no longer available";
+                }
+                $stmt_stock->close();
             }
-            $stmt_item->close();
             
-            $connection->commit();
+            if (!$stock_validation_passed) {
+                $connection->rollback();
+                $error_message = "Order cannot be placed due to stock issues:<br>" . implode("<br>", $stock_errors);
+            } else {
+                // Calculate totals
+                $subtotal = 0;
+                foreach ($_SESSION['cart'] as $item) {
+                    $subtotal += $item['price'] * $item['quantity'];
+                }
             
-            // Clear cart
-            $_SESSION['cart'] = [];
-            
-            $success_message = "Order placed successfully! Order Number: #" . $order_number;
+                $tax_rate = 0.08; // 8% tax
+                $tax_amount = $subtotal * $tax_rate;
+                $final_amount = $subtotal + $tax_amount;
+                
+                // Generate order number
+                $order_number = 'SB' . date('Y') . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+                
+                // Insert order
+                $stmt_order = $connection->prepare("INSERT INTO orders (customer_id, order_number, total_amount, tax_amount, final_amount, status, payment_status, order_type) VALUES (?, ?, ?, ?, ?, 'pending', 'pending', 'takeaway')");
+                $stmt_order->bind_param("isddd", $customer_id, $order_number, $subtotal, $tax_amount, $final_amount);
+                $stmt_order->execute();
+                $order_id = $connection->insert_id;
+                $stmt_order->close();
+                
+                // Insert order items and update stock
+                $stmt_item = $connection->prepare("INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?, ?)");
+                $stmt_update_stock = $connection->prepare("UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?");
+                
+                foreach ($_SESSION['cart'] as $product_id => $item) {
+                    $total_price = $item['price'] * $item['quantity'];
+                    $stmt_item->bind_param("iisidi", $order_id, $product_id, $item['name'], $item['quantity'], $item['price'], $total_price);
+                    $stmt_item->execute();
+                    
+                    // Update stock quantity
+                    $stmt_update_stock->bind_param("ii", $item['quantity'], $product_id);
+                    $stmt_update_stock->execute();
+                }
+                $stmt_item->close();
+                $stmt_update_stock->close();
+                
+                $connection->commit();
+                
+                // Clear cart
+                $_SESSION['cart'] = [];
+                
+                $success_message = "Order placed successfully! Order Number: #" . $order_number;
+            }
             
         } catch (Exception $e) {
             $connection->rollback();
@@ -133,7 +208,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 // Fetch active products
-$products_query = "SELECT id, name, description, price, image_url FROM products WHERE status = 'active' ORDER BY name ASC";
+$products_query = "SELECT id, name, description, price, image_url, stock_quantity, min_stock_level FROM products WHERE status = 'active' ORDER BY name ASC";
 $products_result = mysqli_query($connection, $products_query);
 
 if (!$products_result) {
@@ -293,6 +368,34 @@ $cart_total = $cart_subtotal + $cart_tax;
         }
         .add-btn:hover {
             background-color: #005f3d;
+        }
+        .add-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        /* Stock display styles */
+        .stock-info {
+            margin-bottom: 1rem;
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        .stock-high {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .stock-low {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .stock-out {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
         }
         
         /* Cart sidebar */
@@ -489,6 +592,24 @@ $cart_total = $cart_subtotal + $cart_tax;
                                     $image_src = $image_map[$product['name']];
                                 }
                             ?>
+                            <?php 
+                                $stock_quantity = intval($product['stock_quantity']);
+                                $min_stock_level = intval($product['min_stock_level']);
+                                
+                                // Determine stock status
+                                $stock_class = 'stock-high';
+                                $stock_text = "In Stock ({$stock_quantity} available)";
+                                $is_available = true;
+                                
+                                if ($stock_quantity <= 0) {
+                                    $stock_class = 'stock-out';
+                                    $stock_text = "Out of Stock";
+                                    $is_available = false;
+                                } elseif ($stock_quantity <= $min_stock_level) {
+                                    $stock_class = 'stock-low';
+                                    $stock_text = "Low Stock ({$stock_quantity} remaining)";
+                                }
+                            ?>
                             <div class="product-card">
                                 <img src="<?php echo $image_src; ?>" alt="<?php echo htmlspecialchars($product['name']); ?>" class="product-image" />
                                 <div class="product-content">
@@ -496,11 +617,18 @@ $cart_total = $cart_subtotal + $cart_tax;
                                     <div class="product-description"><?php echo htmlspecialchars($product['description'] ?? 'No description available.'); ?></div>
                                     <div class="product-price">₱<?php echo htmlspecialchars(number_format($product['price'], 2)); ?></div>
                                     
+                                    <!-- Stock Information -->
+                                    <div class="stock-info <?php echo $stock_class; ?>">
+                                        <?php echo $stock_text; ?>
+                                    </div>
+                                    
                                     <form method="POST" class="add-to-cart-form">
                                         <input type="hidden" name="action" value="add_to_cart">
                                         <input type="hidden" name="product_id" value="<?php echo $product['id']; ?>">
-                                        <input type="number" name="quantity" min="1" value="1" class="quantity-input" required>
-                                        <button type="submit" class="add-btn">Add to Cart</button>
+                                        <input type="number" name="quantity" min="1" max="<?php echo $stock_quantity; ?>" value="1" class="quantity-input" <?php echo $is_available ? '' : 'disabled'; ?> required>
+                                        <button type="submit" class="add-btn" <?php echo $is_available ? '' : 'disabled'; ?>>
+                                            <?php echo $is_available ? 'Add to Cart' : 'Out of Stock'; ?>
+                                        </button>
                                     </form>
                                 </div>
                             </div>

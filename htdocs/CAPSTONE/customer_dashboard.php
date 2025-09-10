@@ -71,7 +71,7 @@ mysqli_stmt_close($stmt_orders);
         .header {
             background: linear-gradient(135deg, #00704A, #008B5A);
             color: white;
-            padding: 1rem 2rem;
+            padding: 1rem 2rem 0.5rem 2rem;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         
@@ -93,16 +93,56 @@ mysqli_stmt_close($stmt_orders);
             align-items: center;
             gap: 1rem;
         }
-        
+
+        .menu-bar {
+            display: flex;
+            gap: 1rem;
+            margin-top: 0.7rem;
+            margin-bottom: 0.7rem;
+            justify-content: flex-end;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .menu-link, .logout-btn, .primary-action-btn {
+            text-decoration: none;
+            border-radius: 5px;
+            padding: 0.8rem 1.5rem;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+            display: inline-block;
+        }
+        .menu-link {
+            background: #17a2b8;
+            color: white;
+        }
+        .menu-link:hover {
+            background: #138496;
+        }
+        .edit-profile-link {
+            background: #ffc107;
+            color: #212529;
+        }
+        .edit-profile-link:hover {
+            background: #e0a800;
+        }
+        .primary-action-btn {
+            background: #00704A !important; /* Starbucks Green */
+            font-size: 1.1rem !important;
+            padding: 1rem 2rem !important;
+            border-radius: 8px !important;
+            box-shadow: 0 4px 10px rgba(0, 112, 74, 0.3);
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            color: white;
+        }
+        .primary-action-btn:hover {
+            background: #005f3d !important;
+            transform: translateY(-2px);
+        }
         .logout-btn {
             background: #dc3545;
             color: white;
-            padding: 0.5rem 1rem;
-            text-decoration: none;
-            border-radius: 5px;
-            transition: background-color 0.3s;
         }
-        
         .logout-btn:hover {
             background: #c82333;
         }
@@ -211,18 +251,10 @@ mysqli_stmt_close($stmt_orders);
             .orders-table {
                 font-size: 0.8rem;
             }
-        }
-        .primary-action-btn {
-            background: #00704A !important; /* Starbucks Green */
-            font-size: 1.1rem !important;
-            padding: 1rem 2rem !important;
-            border-radius: 8px !important;
-            box-shadow: 0 4px 10px rgba(0, 112, 74, 0.3);
-            transition: background-color 0.3s ease, transform 0.2s ease;
-        }
-        .primary-action-btn:hover {
-            background: #005f3d !important;
-            transform: translateY(-2px);
+            .menu-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
         }
     </style>
 </head>
@@ -235,10 +267,15 @@ mysqli_stmt_close($stmt_orders);
             </div>
             <div class="customer-info">
                 <span>Welcome, <?php echo $customer_username; ?>!</span>
-                <a href="customer_product.php" class="logout-btn" style="background: #00704A;">View Products</a>
-                <a href="logout.php" class="logout-btn">Logout</a>
             </div>
         </div>
+        <!-- Menu Bar at the Top -->
+        <nav class="menu-bar">
+            <a href="customer_place_order.php" class="primary-action-btn">Order a Product</a>
+            <a href="customer_product.php" class="menu-link">View All Products</a>
+            <a href="customer_profile.php" class="edit-profile-link menu-link">Edit Profile</a>
+            <a href="logout.php" class="logout-btn">Logout</a>
+        </nav>
     </header>
 
     <div class="container">
@@ -298,16 +335,6 @@ mysqli_stmt_close($stmt_orders);
                         </tbody>
                     </table>
                 </div>
-            </div>
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="section">
-            <h2 class="section-title">⚡ Quick Actions</h2>
-            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-                <a href="customer_place_order.php" class="primary-action-btn"> Order an Product </a>
-                <a href="customer_product.php" style="background: #17a2b8; color: white; padding: 0.8rem 1.5rem; text-decoration: none; border-radius: 5px;">View All Products</a>
-                <a href="customer_profile.php" style="background: #ffc107; color: #212529; padding: 0.8rem 1.5rem; text-decoration: none; border-radius: 5px;">Edit Profile</a>
             </div>
         </div>
     </div>
