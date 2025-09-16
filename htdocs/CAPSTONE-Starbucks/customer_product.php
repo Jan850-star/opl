@@ -418,7 +418,7 @@ if (isset($_SESSION['customer_id'])) {
                             <div class="product-category"><?= htmlspecialchars($product['category_name']) ?></div>
                         <?php endif; ?>
                         <div class="product-desc"><?= htmlspecialchars($product['description']) ?></div>
-                        <div class="product-price">$<?= number_format($product['price'], 2) ?></div>
+                        <div class="product-price">₱<?= number_format($product['price'], 2) ?></div>
                         <div class="stock-info">In stock: <?= (int)$product['stock_quantity'] ?></div>
                     </div>
                 <?php endforeach; ?>

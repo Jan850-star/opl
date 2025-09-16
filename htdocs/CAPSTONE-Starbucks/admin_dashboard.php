@@ -23,6 +23,9 @@ if (isset($_POST['update_order_status'])) {
         
         if (mysqli_stmt_affected_rows($stmt) > 0) {
             $success_message = "Order #$order_id status updated to " . ucfirst($new_status) . ".";
+            // Redirect to prevent form resubmission
+            header("Location: admin_dashboard.php?updated=1&order_id=$order_id&status=$new_status");
+            exit();
         } else {
             $error_message = "Failed to update order status.";
         }
@@ -85,6 +88,9 @@ if (isset($_POST['bulk_update_status'])) {
         
         if ($affected_rows > 0) {
             $success_message = "Successfully updated $affected_rows " . ucfirst($current_status) . " orders to " . ucfirst($new_status) . " status.";
+            // Redirect to prevent form resubmission
+            header("Location: admin_dashboard.php?bulk_updated=1&count=$affected_rows&from=$current_status&to=$new_status");
+            exit();
         } else {
             $error_message = "No orders found with " . ucfirst($current_status) . " status to update.";
         }
@@ -459,6 +465,217 @@ if ($low_stock_result) {
             color: #721c24;
         }
 
+        .status-refunded {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .status-select {
+            padding: 0.4rem 0.8rem;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        .status-select:focus {
+            outline: none;
+            border-color: #00704a;
+            box-shadow: 0 0 0 3px rgba(0, 112, 74, 0.1);
+        }
+
+        .status-select:hover {
+            border-color: #00704a;
+            transform: translateY(-1px);
+        }
+
+        .status-select option {
+            padding: 0.5rem;
+            background: white;
+            color: #333;
+        }
+
+        .status-select option:checked {
+            background: #00704a;
+            color: white;
+        }
+
+        .order-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .quick-status-btn {
+            padding: 0.3rem 0.6rem;
+            border: none;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .quick-status-btn.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .quick-status-btn.preparing {
+            background: #ffeaa7;
+            color: #d68910;
+        }
+
+        .quick-status-btn.ready {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .quick-status-btn.completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .quick-status-btn.cancelled {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .quick-status-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .actions-cell {
+            min-width: 180px;
+            text-align: center;
+        }
+
+        .status-form {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .status-form .status-select {
+            width: 100%;
+            max-width: 150px;
+            font-size: 0.8rem;
+            padding: 0.5rem 0.8rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 20px;
+            background: linear-gradient(135deg, #f8f9fa, #ffffff);
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .status-form .status-select:hover {
+            border-color: #00704a;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 112, 74, 0.2);
+        }
+
+        .status-form .status-select:focus {
+            outline: none;
+            border-color: #00704a;
+            box-shadow: 0 0 0 3px rgba(0, 112, 74, 0.1);
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 0.3rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 0.5rem;
+        }
+
+        .quick-action-btn {
+            padding: 0.25rem 0.5rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .quick-action-btn.pending {
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .quick-action-btn.preparing {
+            background: linear-gradient(135deg, #ffeaa7, #ffd93d);
+            color: #d68910;
+            border: 1px solid #ffd93d;
+        }
+
+        .quick-action-btn.ready {
+            background: linear-gradient(135deg, #d1ecf1, #bee5eb);
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .quick-action-btn.completed {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .quick-action-btn.cancelled {
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .quick-action-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+        }
+
+        .action-label {
+            font-size: 0.75rem;
+            color: #666;
+            margin-bottom: 0.3rem;
+            font-weight: 500;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.3rem;
+        }
+
+        .status-indicator.pending { background: #ffc107; }
+        .status-indicator.preparing { background: #fd7e14; }
+        .status-indicator.ready { background: #20c997; }
+        .status-indicator.completed { background: #28a745; }
+        .status-indicator.cancelled { background: #dc3545; }
+        .status-indicator.refunded { background: #6c757d; }
+
+        .order-actions-container {
+            background: linear-gradient(135deg, #f8f9fa, #ffffff);
+            padding: 0.8rem;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
         @media (max-width: 768px) {
             .nav-content {
                 flex-direction: column;
@@ -479,6 +696,33 @@ if ($low_stock_result) {
 
             .stats-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .actions-cell {
+                min-width: 200px;
+            }
+
+            .order-actions-container {
+                padding: 0.6rem;
+            }
+
+            .status-form .status-select {
+                font-size: 0.75rem;
+                padding: 0.4rem 0.6rem;
+            }
+
+            .quick-actions {
+                gap: 0.2rem;
+            }
+
+            .quick-action-btn {
+                font-size: 0.65rem;
+                padding: 0.2rem 0.4rem;
+                min-width: 50px;
+            }
+
+            .action-label {
+                font-size: 0.7rem;
             }
         }
     </style>
@@ -529,6 +773,19 @@ if ($low_stock_result) {
         <?php if (isset($error_message)): ?>
         <div class="error-message">
             ❌ <?php echo htmlspecialchars($error_message); ?>
+        </div>
+        <?php endif; ?>
+
+        <!-- URL Parameter Success Messages -->
+        <?php if (isset($_GET['updated']) && $_GET['updated'] == '1'): ?>
+        <div class="success-message">
+            ✅ Order #<?php echo htmlspecialchars($_GET['order_id']); ?> status updated to <?php echo ucfirst(htmlspecialchars($_GET['status'])); ?>!
+        </div>
+        <?php endif; ?>
+
+        <?php if (isset($_GET['bulk_updated']) && $_GET['bulk_updated'] == '1'): ?>
+        <div class="success-message">
+            ✅ Successfully updated <?php echo htmlspecialchars($_GET['count']); ?> orders from <?php echo ucfirst(htmlspecialchars($_GET['from'])); ?> to <?php echo ucfirst(htmlspecialchars($_GET['to'])); ?>!
         </div>
         <?php endif; ?>
 
@@ -586,6 +843,28 @@ if ($low_stock_result) {
             </div>
         </div>
 
+        <!-- Bulk Order Management -->
+        <div class="section">
+            <h2>⚡ Quick Order Management</h2>
+            <form method="POST" action="" style="margin-bottom: 1.5rem;">
+                <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                    <label for="bulk_action" style="font-weight: 500;">Bulk Actions:</label>
+                    <select name="bulk_action" id="bulk_action" style="padding: 0.5rem; border: 2px solid #ddd; border-radius: 5px; min-width: 200px;">
+                        <option value="">Select Action</option>
+                        <option value="start_preparing">Start Preparing All Pending</option>
+                        <option value="mark_ready">Mark All Pending as Ready</option>
+                        <option value="complete">Complete All Pending</option>
+                        <option value="preparing_to_ready">Mark Preparing as Ready</option>
+                        <option value="preparing_to_complete">Complete All Preparing</option>
+                        <option value="ready_to_complete">Complete All Ready</option>
+                    </select>
+                    <button type="submit" name="bulk_update_status" class="btn btn-primary" style="padding: 0.5rem 1rem; background: #00704a; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                        Execute Bulk Action
+                    </button>
+                </div>
+            </form>
+        </div>
+
         <!-- Recent Orders Section -->
         <div class="section">
             <h2>📋 Recent Orders</h2>
@@ -599,19 +878,47 @@ if ($low_stock_result) {
                             <th>Amount</th>
                             <th>Status</th>
                             <th>Date</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php while ($order = mysqli_fetch_assoc($orders_result)): ?>
+                        <?php 
+                        // Reset the result pointer to ensure we can loop through results
+                        mysqli_data_seek($orders_result, 0);
+                        while ($order = mysqli_fetch_assoc($orders_result)): 
+                        ?>
                         <tr>
                             <td>
                                 <strong><?php echo htmlspecialchars($order['order_number']); ?></strong>
                             </td>
                             <td>
                                 <?php echo htmlspecialchars($order['customer_name']); ?>
+                                <br><small style="color: #666;"><?php echo htmlspecialchars($order['customer_phone']); ?></small>
                             </td>
                             <td>
                                 <?php echo $order['item_count']; ?> items
+                                <?php
+                                // Fetch items with selected sizes for this order
+                                $items_stmt = $connection->prepare("SELECT product_name, quantity, COALESCE(selected_size, size) AS item_size FROM order_items WHERE order_id = ? ORDER BY id ASC");
+                                if ($items_stmt) {
+                                    $items_stmt->bind_param("i", $order['id']);
+                                    $items_stmt->execute();
+                                    $items_result = $items_stmt->get_result();
+                                    if ($items_result && $items_result->num_rows > 0) {
+                                        echo '<div style="margin-top:6px; display:flex; flex-direction:column; gap:4px;">';
+                                        while ($it = $items_result->fetch_assoc()) {
+                                            $displaySize = $it['item_size'] !== null && $it['item_size'] !== '' && $it['item_size'] !== '0' ? htmlspecialchars($it['item_size']) : 'One Size';
+                                            echo '<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">'
+                                                . '<span style="background:#e8f5e8;color:#00704a;padding:2px 6px;border-radius:10px;font-size:0.75rem;font-weight:700;">' . (int)$it['quantity'] . 'x</span>'
+                                                . '<span style="font-weight:600;color:#333;">' . htmlspecialchars($it['product_name']) . '</span>'
+                                                . '<span style="background:#d1ecf1;color:#0c5460;padding:2px 6px;border-radius:10px;font-size:0.72rem;font-weight:700;">' . $displaySize . '</span>'
+                                              . '</div>';
+                                        }
+                                        echo '</div>';
+                                    }
+                                    $items_stmt->close();
+                                }
+                                ?>
                             </td>
                             <td>
                                 ₱<?php echo number_format($order['final_amount'], 2); ?>
@@ -623,6 +930,34 @@ if ($low_stock_result) {
                             </td>
                             <td>
                                 <?php echo date('M j, Y g:i A', strtotime($order['created_at'])); ?>
+                            </td>
+                            <td class="actions-cell">
+                                <div class="order-actions-container">
+                                    <div class="action-label">
+                                        <span class="status-indicator status-<?php echo $order['status']; ?>"></span>
+                                        Update Status
+                                    </div>
+                                    <form method="POST" action="" class="status-form">
+                                        <input type="hidden" name="order_id" value="<?php echo $order['id']; ?>">
+                                        <select name="new_status" class="status-select" onchange="this.form.submit()">
+                                            <option value="">Select Status</option>
+                                            <option value="pending" <?php echo $order['status'] == 'pending' ? 'selected' : ''; ?>>⏳ Pending</option>
+                                            <option value="confirmed" <?php echo $order['status'] == 'confirmed' ? 'selected' : ''; ?>>✅ Confirmed</option>
+                                            <option value="preparing" <?php echo $order['status'] == 'preparing' ? 'selected' : ''; ?>>👨‍🍳 Preparing</option>
+                                            <option value="ready" <?php echo $order['status'] == 'ready' ? 'selected' : ''; ?>>📦 Ready</option>
+                                            <option value="completed" <?php echo $order['status'] == 'completed' ? 'selected' : ''; ?>>✅ Completed</option>
+                                            <option value="cancelled" <?php echo $order['status'] == 'cancelled' ? 'selected' : ''; ?>>❌ Cancelled</option>
+                                            <option value="refunded" <?php echo $order['status'] == 'refunded' ? 'selected' : ''; ?>>💰 Refunded</option>
+                                        </select>
+                                        <input type="hidden" name="update_order_status" value="1">
+                                    </form>
+                                    <div class="quick-actions">
+                                        <button type="button" class="quick-action-btn pending" onclick="quickStatusChange(<?php echo $order['id']; ?>, 'pending')">Pending</button>
+                                        <button type="button" class="quick-action-btn preparing" onclick="quickStatusChange(<?php echo $order['id']; ?>, 'preparing')">Preparing</button>
+                                        <button type="button" class="quick-action-btn ready" onclick="quickStatusChange(<?php echo $order['id']; ?>, 'ready')">Ready</button>
+                                        <button type="button" class="quick-action-btn completed" onclick="quickStatusChange(<?php echo $order['id']; ?>, 'completed')">Complete</button>
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                         <?php endwhile; ?>
@@ -915,6 +1250,176 @@ if ($low_stock_result) {
 
         // Initialize tooltips
         addTooltips();
+
+        // Order status update confirmation
+        document.querySelectorAll('.status-select').forEach(function(select) {
+            select.addEventListener('change', function(e) {
+                const newStatus = this.value;
+                const orderId = this.form.querySelector('input[name="order_id"]').value;
+                const currentStatus = this.closest('tr').querySelector('.status-badge').textContent.trim();
+                
+                if (newStatus && newStatus !== currentStatus.toLowerCase()) {
+                    if (confirm(`Are you sure you want to change order #${orderId} from "${currentStatus}" to "${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}"?`)) {
+                        // Add loading state
+                        this.style.opacity = '0.7';
+                        this.style.pointerEvents = 'none';
+                        
+                        // Submit the form
+                        this.form.submit();
+                    } else {
+                        // Reset to current status
+                        this.value = '';
+                    }
+                }
+            });
+        });
+
+        // Bulk action confirmation
+        document.querySelector('form[method="POST"]').addEventListener('submit', function(e) {
+            const bulkAction = document.getElementById('bulk_action').value;
+            if (bulkAction) {
+                const actionText = document.getElementById('bulk_action').selectedOptions[0].text;
+                if (!confirm(`Are you sure you want to ${actionText.toLowerCase()}?`)) {
+                    e.preventDefault();
+                }
+            }
+        });
+
+        // Add visual feedback for status changes
+        function addStatusChangeFeedback() {
+            const statusSelects = document.querySelectorAll('.status-select');
+            statusSelects.forEach(function(select) {
+                select.addEventListener('change', function() {
+                    const row = this.closest('tr');
+                    row.style.transition = 'all 0.3s ease';
+                    row.style.backgroundColor = '#e8f5e8';
+                    
+                    setTimeout(function() {
+                        row.style.backgroundColor = '';
+                    }, 2000);
+                });
+            });
+        }
+
+        // Initialize status change feedback
+        addStatusChangeFeedback();
+
+        // Auto-refresh after status update
+        if (window.location.search.includes('updated=1')) {
+            setTimeout(function() {
+                window.location.href = window.location.pathname;
+            }, 3000);
+        }
+
+        // Add keyboard shortcuts for common status changes
+        document.addEventListener('keydown', function(e) {
+            // Ctrl + 1 for Pending
+            if (e.ctrlKey && e.key === '1') {
+                e.preventDefault();
+                document.querySelectorAll('.status-select').forEach(function(select) {
+                    if (select.value === '') {
+                        select.value = 'pending';
+                        select.dispatchEvent(new Event('change'));
+                    }
+                });
+            }
+            
+            // Ctrl + 2 for Preparing
+            if (e.ctrlKey && e.key === '2') {
+                e.preventDefault();
+                document.querySelectorAll('.status-select').forEach(function(select) {
+                    if (select.value === '') {
+                        select.value = 'preparing';
+                        select.dispatchEvent(new Event('change'));
+                    }
+                });
+            }
+            
+            // Ctrl + 3 for Ready
+            if (e.ctrlKey && e.key === '3') {
+                e.preventDefault();
+                document.querySelectorAll('.status-select').forEach(function(select) {
+                    if (select.value === '') {
+                        select.value = 'ready';
+                        select.dispatchEvent(new Event('change'));
+                    }
+                });
+            }
+            
+            // Ctrl + 4 for Completed
+            if (e.ctrlKey && e.key === '4') {
+                e.preventDefault();
+                document.querySelectorAll('.status-select').forEach(function(select) {
+                    if (select.value === '') {
+                        select.value = 'completed';
+                        select.dispatchEvent(new Event('change'));
+                    }
+                });
+            }
+        });
+
+        // Add tooltip for keyboard shortcuts
+        document.querySelectorAll('.status-select').forEach(function(select) {
+            select.title = 'Keyboard shortcuts: Ctrl+1=Pending, Ctrl+2=Preparing, Ctrl+3=Ready, Ctrl+4=Completed';
+        });
+
+        // Quick status change function
+        function quickStatusChange(orderId, newStatus) {
+            if (confirm(`Are you sure you want to change order #${orderId} to "${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}"?`)) {
+                // Create a form and submit it
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '';
+                
+                const orderIdInput = document.createElement('input');
+                orderIdInput.type = 'hidden';
+                orderIdInput.name = 'order_id';
+                orderIdInput.value = orderId;
+                
+                const statusInput = document.createElement('input');
+                statusInput.type = 'hidden';
+                statusInput.name = 'new_status';
+                statusInput.value = newStatus;
+                
+                const updateInput = document.createElement('input');
+                updateInput.type = 'hidden';
+                updateInput.name = 'update_order_status';
+                updateInput.value = '1';
+                
+                form.appendChild(orderIdInput);
+                form.appendChild(statusInput);
+                form.appendChild(updateInput);
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+
+        // Add hover effects to action containers
+        document.querySelectorAll('.order-actions-container').forEach(function(container) {
+            container.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-2px)';
+                this.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+            });
+            
+            container.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0)';
+                this.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+            });
+        });
+
+        // Add loading state to quick action buttons
+        document.querySelectorAll('.quick-action-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                this.style.opacity = '0.7';
+                this.style.transform = 'scale(0.95)';
+                
+                setTimeout(() => {
+                    this.style.opacity = '1';
+                    this.style.transform = 'scale(1)';
+                }, 200);
+            });
+        });
     </script>
 </body>
 </html>

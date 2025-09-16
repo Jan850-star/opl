@@ -17,10 +17,46 @@ if (isset($_POST['add_product_submit'])) {
     $stock_quantity = intval($_POST['stock_quantity']);
     $min_stock_level = intval($_POST['min_stock_level']);
     $status = $_POST['status'];
+    $image_path = '';
+    
+    // Handle image upload
+    if (isset($_FILES['product_image']) && $_FILES['product_image']['error'] == 0) {
+        $upload_dir = 'uploads/products/';
+        
+        // Create upload directory if it doesn't exist
+        if (!file_exists($upload_dir)) {
+            mkdir($upload_dir, 0777, true);
+        }
+        
+        $file_extension = strtolower(pathinfo($_FILES['product_image']['name'], PATHINFO_EXTENSION));
+        $allowed_extensions = array('jpg', 'jpeg', 'png', 'gif', 'webp');
+        
+        if (in_array($file_extension, $allowed_extensions)) {
+            $file_size = $_FILES['product_image']['size'];
+            $max_file_size = 5 * 1024 * 1024; // 5MB
+            
+            if ($file_size <= $max_file_size) {
+                $new_filename = uniqid() . '_' . time() . '.' . $file_extension;
+                $upload_path = $upload_dir . $new_filename;
+                
+                if (move_uploaded_file($_FILES['product_image']['tmp_name'], $upload_path)) {
+                    $image_path = $upload_path;
+                } else {
+                    $error_message = "Failed to upload image. Please try again.";
+                }
+            } else {
+                $error_message = "Image file size must be less than 5MB.";
+            }
+        } else {
+            $error_message = "Invalid image format. Please upload JPG, JPEG, PNG, GIF, or WebP files only.";
+        }
+    }
     
     // Validation
     if (empty($name) || empty($description) || $price <= 0 || $stock_quantity < 0 || $min_stock_level < 0 || $category_id <= 0) {
         $error_message = "Please fill in all required fields with valid values.";
+    } elseif (isset($error_message)) {
+        // Image upload error occurred, don't proceed
     } else {
         // Check if product name already exists
         $check_query = "SELECT id FROM products WHERE name = ?";
@@ -33,9 +69,9 @@ if (isset($_POST['add_product_submit'])) {
             $error_message = "A product with this name already exists.";
         } else {
             // Insert new product
-            $insert_query = "INSERT INTO products (category_id, name, description, price, stock_quantity, min_stock_level, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+            $insert_query = "INSERT INTO products (category_id, name, description, price, stock_quantity, min_stock_level, status, image_path, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
             $stmt = mysqli_prepare($connection, $insert_query);
-            mysqli_stmt_bind_param($stmt, "issdiis", $category_id, $name, $description, $price, $stock_quantity, $min_stock_level, $status);
+            mysqli_stmt_bind_param($stmt, "issdiiss", $category_id, $name, $description, $price, $stock_quantity, $min_stock_level, $status, $image_path);
             
             if (mysqli_stmt_execute($stmt)) {
                 $product_id = mysqli_insert_id($connection);
@@ -64,7 +100,7 @@ if (isset($_POST['add_product_submit'])) {
 }
 
 // Get all products for display with category names
-$products_query = "SELECT p.id, p.name, p.description, p.price, c.name as category_name, p.stock_quantity, p.min_stock_level, p.status, p.created_at 
+$products_query = "SELECT p.id, p.name, p.description, p.price, c.name as category_name, p.stock_quantity, p.min_stock_level, p.status, p.image_path, p.created_at 
                    FROM products p 
                    JOIN categories c ON p.category_id = c.id 
                    ORDER BY p.created_at DESC LIMIT 10";
@@ -285,6 +321,34 @@ if ($categories_result) {
             min-height: 100px;
         }
 
+        .form-group input[type="file"] {
+            padding: 0.5rem;
+            border: 2px dashed #bbdefb;
+            border-radius: 8px;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .form-group input[type="file"]:hover {
+            border-color: #2196f3;
+            background: #e3f2fd;
+        }
+
+        .form-group input[type="file"]:focus {
+            outline: none;
+            border-color: #2196f3;
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+        }
+
+        #image-preview {
+            text-align: left;
+        }
+
+        #preview-img {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
         .form-group.full-width {
             grid-column: 1 / -1;
         }
@@ -451,7 +515,7 @@ if ($categories_result) {
         <!-- Add Product Section -->
         <div class="add-product-section">
             <div class="add-product-title">➕ Add New Product</div>
-            <form method="POST" class="form-grid" onsubmit="return validateForm();">
+            <form method="POST" class="form-grid" enctype="multipart/form-data" onsubmit="return validateForm();">
                 <div class="form-group">
                     <label for="product_name">Product Name *</label>
                     <input type="text" name="product_name" id="product_name" required 
@@ -501,6 +565,18 @@ if ($categories_result) {
                     </select>
                 </div>
 
+                <div class="form-group">
+                    <label for="product_image">Product Image</label>
+                    <input type="file" name="product_image" id="product_image" accept="image/*" onchange="previewImage(this)">
+                    <small style="color: #666; font-size: 0.8rem; margin-top: 0.25rem; display: block;">
+                        Supported formats: JPG, JPEG, PNG, GIF, WebP (Max: 5MB)
+                    </small>
+                    <div id="image-preview" style="margin-top: 1rem; display: none;">
+                        <img id="preview-img" style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 2px solid #bbdefb;">
+                        <button type="button" onclick="removeImage()" style="margin-left: 1rem; padding: 0.5rem 1rem; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">Remove Image</button>
+                    </div>
+                </div>
+
                 <div class="form-group full-width">
                     <label for="description">Description *</label>
                     <textarea name="description" id="description" required 
@@ -520,6 +596,7 @@ if ($categories_result) {
                 <table>
                     <thead>
                         <tr>
+                            <th>Image</th>
                             <th>ID</th>
                             <th>Product Name</th>
                             <th>Category</th>
@@ -532,6 +609,17 @@ if ($categories_result) {
                     <tbody>
                         <?php while ($product = mysqli_fetch_assoc($products_result)): ?>
                         <tr>
+                            <td>
+                                <?php if (!empty($product['image_path']) && file_exists($product['image_path'])): ?>
+                                    <img src="<?php echo htmlspecialchars($product['image_path']); ?>" 
+                                         alt="<?php echo htmlspecialchars($product['name']); ?>" 
+                                         style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 2px solid #e0e0e0;">
+                                <?php else: ?>
+                                    <div style="width: 60px; height: 60px; background: #f8f9fa; border: 2px solid #e0e0e0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #666; font-size: 0.8rem;">
+                                        No Image
+                                    </div>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <strong>#<?php echo $product['id']; ?></strong>
                             </td>
@@ -715,6 +803,60 @@ if ($categories_result) {
 
         // Smooth scroll for better UX
         document.documentElement.style.scrollBehavior = 'smooth';
+
+        // Image preview functionality
+        function previewImage(input) {
+            const file = input.files[0];
+            const preview = document.getElementById('image-preview');
+            const previewImg = document.getElementById('preview-img');
+            
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                preview.style.display = 'none';
+            }
+        }
+
+        function removeImage() {
+            const fileInput = document.getElementById('product_image');
+            const preview = document.getElementById('image-preview');
+            
+            fileInput.value = '';
+            preview.style.display = 'none';
+        }
+
+        // Drag and drop functionality for image upload
+        const fileInput = document.getElementById('product_image');
+        const formGroup = fileInput.closest('.form-group');
+        
+        formGroup.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            formGroup.style.border = '2px dashed #2196f3';
+            formGroup.style.backgroundColor = '#f0f8ff';
+        });
+        
+        formGroup.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            formGroup.style.border = '';
+            formGroup.style.backgroundColor = '';
+        });
+        
+        formGroup.addEventListener('drop', function(e) {
+            e.preventDefault();
+            formGroup.style.border = '';
+            formGroup.style.backgroundColor = '';
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                previewImage(fileInput);
+            }
+        });
     </script>
 </body>
 </html>

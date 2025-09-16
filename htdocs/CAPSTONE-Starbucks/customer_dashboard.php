@@ -24,14 +24,16 @@ $customer_stats_query = "
         (SELECT COUNT(*) FROM orders WHERE customer_id = ?) as total_orders,
         (SELECT COALESCE(SUM(final_amount), 0) FROM orders WHERE customer_id = ? AND status = 'completed') as total_spent,
         (SELECT COUNT(*) FROM orders WHERE customer_id = ? AND status = 'pending') as pending_orders,
-        (SELECT COALESCE(SUM(points), 0) FROM loyalty_points WHERE customer_id = ?) as loyalty_points
+        (SELECT COALESCE(SUM(points), 0) FROM loyalty_points WHERE customer_id = ?) as loyalty_points,
+        (SELECT COALESCE(balance, 0) FROM digital_wallet WHERE customer_id = ?) as wallet_balance
 ";
 $stmt_stats = mysqli_prepare($connection, $customer_stats_query);
-mysqli_stmt_bind_param($stmt_stats, "iiii", $customer_id, $customer_id, $customer_id, $customer_id);
+mysqli_stmt_bind_param($stmt_stats, "iiiii", $customer_id, $customer_id, $customer_id, $customer_id, $customer_id);
 mysqli_stmt_execute($stmt_stats);
 $result_stats = mysqli_stmt_get_result($stmt_stats);
 $customer_stats = mysqli_fetch_assoc($result_stats);
 mysqli_stmt_close($stmt_stats);
+
 
 // Get recent orders for the customer
 $orders_query = "
@@ -47,6 +49,7 @@ mysqli_stmt_execute($stmt_orders);
 $orders_result = mysqli_stmt_get_result($stmt_orders);
 $orders = mysqli_fetch_all($orders_result, MYSQLI_ASSOC);
 mysqli_stmt_close($stmt_orders);
+
 ?>
 
 <!DOCTYPE html>
@@ -155,7 +158,7 @@ mysqli_stmt_close($stmt_orders);
         
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1rem;
             margin-bottom: 2rem;
         }
@@ -234,6 +237,7 @@ mysqli_stmt_close($stmt_orders);
         .status-completed { background: #e2e3e5; color: #383d41; }
         .status-cancelled { background: #f8d7da; color: #721c24; }
         
+        
         @media (max-width: 768px) {
             .main-content {
                 grid-template-columns: 1fr;
@@ -262,7 +266,7 @@ mysqli_stmt_close($stmt_orders);
     <header class="header">
         <div class="header-content">
             <div class="logo">
-                <h1>Your Dashboard</h1>
+            <h1>Your Dashboard</h1>
                 <p>Welcome to Starbucks!</p>
             </div>
             <div class="customer-info">
@@ -272,8 +276,9 @@ mysqli_stmt_close($stmt_orders);
         <!-- Menu Bar at the Top -->
         <nav class="menu-bar">
             <a href="customer_place_order.php" class="primary-action-btn">Order a Product</a>
+            <a href="customer_digital_wallet.php" class="menu-link">💳 Digital Wallet</a>
             <a href="customer_product.php" class="menu-link">View All Products</a>
-            <a href="customer_profile.php" class="edit-profile-link menu-link">Edit Profile</a>
+            <a href="customer_profile.php" class="edit-profile-link">Edit Profile</a>
             <a href="logout.php" class="logout-btn">Logout</a>
         </nav>
     </header>
@@ -287,7 +292,7 @@ mysqli_stmt_close($stmt_orders);
             </div>
             <div class="stat-card">
                 <h3>Total Spent</h3>
-                <div class="value">$<?php echo number_format($customer_stats['total_spent'], 2); ?></div>
+                <div class="value">₱<?php echo number_format($customer_stats['total_spent'], 2); ?></div>
             </div>
             <div class="stat-card">
                 <h3>Pending Orders</h3>
@@ -296,6 +301,10 @@ mysqli_stmt_close($stmt_orders);
             <div class="stat-card">
                 <h3>Loyalty Points</h3>
                 <div class="value"><?php echo $customer_stats['loyalty_points']; ?></div>
+            </div>
+            <div class="stat-card">
+                <h3>Digital Wallet</h3>
+                <div class="value">₱<?php echo number_format($customer_stats['wallet_balance'], 2); ?></div>
             </div>
         </div>
 
@@ -318,7 +327,7 @@ mysqli_stmt_close($stmt_orders);
                                 <?php foreach ($orders as $order): ?>
                                 <tr>
                                     <td>#<?php echo htmlspecialchars($order['order_number']); ?></td>
-                                    <td>$<?php echo number_format($order['total_amount'], 2); ?></td>
+                                    <td>₱<?php echo number_format($order['total_amount'], 2); ?></td>
                                     <td>
                                         <span class="status-badge status-<?php echo $order['status']; ?>">
                                             <?php echo ucfirst($order['status']); ?>
